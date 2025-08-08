@@ -1,7 +1,7 @@
 // frontend/src/pages/FormListPage.js
 import React, { useEffect, useState } from "react";
-import { listarFormularios, removerFormulario } from "../api/formularioApi";
 import { useNavigate } from "react-router-dom";
+import { listarFormularios, removerFormulario } from "../api/formularioApi";
 import FormCard from "../components/FormCard";
 import ConfirmModal from "../components/ConfirmModal";
 
@@ -43,7 +43,9 @@ const FormListPage = () => {
     <div className="form-list-page">
       <h2>Formulários Disponíveis</h2>
       {loading && <p>Carregando...</p>}
-      {!loading && formularios.length === 0 && <p>Nenhum formulário cadastrado.</p>}
+      {!loading && formularios.length === 0 && (
+        <p>Nenhum formulário cadastrado.</p>
+      )}
       <div className="form-list">
         {formularios.map((form) => (
           <FormCard
@@ -52,22 +54,38 @@ const FormListPage = () => {
             description={form.descricao}
             onSubmit={(e) => e.preventDefault()}
           >
-            <button type="button" onClick={() => navigate(`/formularios/${form.id}/responder`)}>
-              Responder
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFormToDelete(form.id);
-                setModalOpen(true);
-              }}
-              style={{ marginLeft: 8 }}
-            >
-              Excluir
-            </button>
+            <div className="form-card__actions" style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => navigate(`/formularios/${form.id}/responder`)}
+              >
+                Responder
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => navigate(`/formularios/${form.id}/respostas`)}
+              >
+                Ver Respostas
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => {
+                  setFormToDelete(form.id);
+                  setModalOpen(true);
+                }}
+              >
+                Excluir
+              </button>
+            </div>
           </FormCard>
         ))}
       </div>
+
       <ConfirmModal
         isOpen={modalOpen}
         title="Remover Formulário"

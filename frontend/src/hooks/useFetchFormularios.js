@@ -1,12 +1,7 @@
 // frontend/src/hooks/useFetchFormularios.js
-
 import { useEffect, useState } from "react";
 import { listarFormularios } from "../api/formularioApi";
 
-/**
- * Hook para buscar e atualizar a lista de formulários SENAI-Saúde de forma reativa.
- * Aceita parâmetro opcional de usuário para filtrar os formulários desse usuário.
- */
 export default function useFetchFormularios(usuario = null) {
   const [formularios, setFormularios] = useState([]);
   const [loading, setLoading] = useState(false);

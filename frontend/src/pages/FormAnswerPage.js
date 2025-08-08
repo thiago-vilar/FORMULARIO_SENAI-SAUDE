@@ -1,112 +1,74 @@
 // frontend/src/pages/FormAnswerPage.js
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { buscarFormularioPorId } from "../api/formularioApi";
-import { enviarRespostas } from "../api/respostaApi";
-import FormCard from "../components/FormCard";
+import { enviarResposta } from "../api/respostaApi";
 import CampoInput from "../components/CampoInput";
+import FormCard from "../components/FormCard";
 
-export default function FormAnswerPage() {
+const FormAnswerPage = () => {
   const { id } = useParams();
-  const [form, setForm] = useState(null);
-  const [valores, setValores] = useState({});
-  const [resultado, setResultado] = useState(null);
+  const navigate = useNavigate();
+  const [formulario, setFormulario] = useState(null);
+  const [respostas, setRespostas] = useState({});
   const [mensagem, setMensagem] = useState("");
 
   useEffect(() => {
-    (async () => {
+    const fetchFormulario = async () => {
       try {
-        const f = await buscarFormularioPorId(id);
-        setForm(f);
-        const init = {};
-        (f.campos || [])
-          .filter((c) => c.tipo !== "calculated")
-          .forEach((c) => {
-            const nome = c.nome || (c.label || "").trim().replace(/\s+/g, "_").toLowerCase();
-            init[nome] = "";
-          });
-        setValores(init);
-      } catch (e) {
-        setMensagem(e.detail || "Falha ao carregar formulário");
+        const data = await buscarFormularioPorId(id);
+        setFormulario(data);
+      } catch {
+        setMensagem("Erro ao carregar formulário.");
       }
-    })();
+    };
+    fetchFormulario();
   }, [id]);
 
-  const onChange = (nome, v) => setValores((prev) => ({ ...prev, [nome]: v }));
+  const handleChange = (campoId, valor) => {
+    setRespostas((prev) => ({ ...prev, [campoId]: valor }));
+  };
 
-  const onSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setMensagem("");
     try {
-      const payload = {};
-      // envia apenas campos não calculados
-      (form.campos || [])
-        .filter((c) => c.tipo !== "calculated")
-        .forEach((c) => {
-          const nome = c.nome || (c.label || "").trim().replace(/\s+/g, "_").toLowerCase();
-          const raw = valores[nome];
-          payload[nome] = c.tipo === "number" ? Number(raw) : raw;
-        });
-
-      const r = await enviarRespostas(id, payload);
-      setResultado(r);
-      setMensagem("");
-    } catch (e) {
-      setMensagem(e.detail || "Falha ao enviar respostas");
+      await enviarResposta(id, { respostas });
+      setMensagem("Respostas enviadas com sucesso!");
+      setTimeout(() => navigate(`/formularios/${id}/respostas`), 1500);
+    } catch (error) {
+      setMensagem(error?.detail || "Erro ao enviar respostas.");
     }
   };
 
-  if (!form) return <p>Carregando...</p>;
+  if (!formulario) return <p>Carregando formulário...</p>;
 
   return (
     <div className="form-answer-page">
-      <FormCard title={form.nome} description={form.descricao} onSubmit={onSubmit}>
-        {(form.campos || []).filter(c => c.tipo !== "calculated").map((c) => {
-          const nome = c.nome || (c.label || "").trim().replace(/\s+/g, "_").toLowerCase();
-          const type = c.tipo === "number" ? "number" : c.tipo === "select" ? "select" : "text";
-          return (
-            <div key={c.id || nome}>
-              {type === "select" ? (
-                <>
-                  <label>{c.label}</label>
-                  <select
-                    value={valores[nome]}
-                    onChange={(e) => onChange(nome, e.target.value)}
-                    required={!!c.obrigatorio}
-                  >
-                    <option value="">Selecione</option>
-                    {(c.opcoes || []).map((op) =>
-                      typeof op === "string" ? (
-                        <option key={op} value={op}>{op}</option>
-                      ) : (
-                        <option key={op.value} value={op.value}>{op.label}</option>
-                      )
-                    )}
-                  </select>
-                </>
-              ) : (
-                <CampoInput
-                  label={c.label}
-                  type={type}
-                  name={nome}
-                  value={valores[nome]}
-                  onChange={(e) => onChange(nome, e.target.value)}
-                  step={type === "number" ? "0.01" : undefined}
-                  required={!!c.obrigatorio}
-                />
-              )}
-            </div>
-          );
-        })}
-        <button type="submit">Enviar</button>
+      <h2>Responder Formulário</h2>
+      <FormCard
+        title={formulario.nome}
+        description={formulario.descricao}
+        onSubmit={handleSubmit}
+      >
+        {formulario.campos?.map((campo) => (
+          <CampoInput
+            key={campo.id}
+            label={campo.label}
+            type={campo.tipo || "text"}
+            value={respostas[campo.id] || ""}
+            name={campo.id}
+            onChange={(e) => handleChange(campo.id, e.target.value)}
+            required={campo.obrigatorio}
+          />
+        ))}
+        <button type="submit" className="btn btn-primary">
+          Enviar Respostas
+        </button>
       </FormCard>
-
       {mensagem && <p className="mensagem">{mensagem}</p>}
-      {resultado && (
-        <div className="resultado-imc">
-          <h4>Resposta gravada</h4>
-          <pre style={{ background: "#f6f6f6", padding: 12 }}>{JSON.stringify(resultado, null, 2)}</pre>
-        </div>
-      )}
     </div>
   );
-}
+};
+
+export default FormAnswerPage;

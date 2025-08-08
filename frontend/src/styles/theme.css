@@ -1,161 +1,81 @@
 /* frontend/src/styles/theme.css */
+/* (substitua o arquivo inteiro por este se quiser garantir o cabeçalho bonitão) */
 
 /* Tema base SENAI-Saúde — Azul, Branco, Cinza Claro */
-:root {
-  --color-primary: #004D9D;        /* Azul padrão SENAI */
-  --color-primary-dark: #01376d;
-  --color-secondary: #0070c7;
-  --color-success: #44b170;
-  --color-error: #da2e32;
-  --color-background: #f5f7fa;     /* Cinza claro */
-  --color-card: #fff;
-  --color-border: #e0e6ef;
-  --color-text: #253857;
-  --color-button-text: #fff;
-  --color-alert-bg: #e3f2fd;
-  --color-alert-text: #004D9D;
-}
-
-/* Reset + estrutura básica */
-html, body, #root {
-  height: 100%;
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-  font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+body {
   background-color: var(--color-background);
   color: var(--color-text);
+  font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
-body {
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-}
-
-#root {
-  width: 100vw;
-}
-
-/* Header com logo e título */
-.app-header {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  justify-content: center;
-  padding: 32px 0 12px 0;
-  background: var(--color-card);
-  box-shadow: 0 2px 12px 0 rgba(38, 50, 56, 0.05);
-  margin-bottom: 1.5rem;
-}
-
-.logo-senai {
-  height: 108px;
-  width: auto;
-  margin-right: 12px;
-}
-
-/* Links */
 a {
   color: var(--color-primary);
   text-decoration: none;
 }
-a:hover {
-  text-decoration: underline;
-}
 
-/* Títulos */
 h1, h2, h3, h4 {
   color: var(--color-primary-dark);
-  margin: 0 0 8px 0;
-  font-weight: 700;
 }
 
-h1 {
-  font-size: 2.1rem;
-  letter-spacing: 1px;
-}
-
+/* Cartões / formulários */
 .form-card {
   background: var(--color-card);
-  border-radius: 16px;
-  box-shadow: 0 4px 18px 0 rgba(38, 50, 56, 0.07);
-  margin: 2rem auto 2.5rem auto;
-  max-width: 480px;
-  padding: 2.5rem 2rem 2rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px 0 rgba(38, 50, 56, 0.05);
+  margin: 1.5rem auto;
+  max-width: 540px;
+  padding: 2rem;
   border: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
 }
 
 .form-card-header h2 {
   margin: 0;
   color: var(--color-primary);
-  font-size: 1.7rem;
-  letter-spacing: 0.3px;
 }
 
 .form-card-body {
   margin-top: 1.5rem;
 }
 
-/* Inputs e labels */
 .campo-input label {
   display: block;
   margin-bottom: 0.8rem;
   color: var(--color-primary-dark);
-  font-size: 1.04rem;
 }
 
 .campo-input input,
-.campo-input select,
-.campo-input textarea {
-  padding: 10px;
+.campo-input select {
+  padding: 8px;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   width: 100%;
   box-sizing: border-box;
   margin-top: 0.2rem;
   margin-bottom: 1rem;
-  font-size: 1rem;
-  background: #fff;
-  color: var(--color-text);
-  transition: border 0.15s;
-}
-.campo-input input:focus,
-.campo-input select:focus,
-.campo-input textarea:focus {
-  border: 1.5px solid var(--color-primary);
-  outline: none;
 }
 
-/* Botões */
 button {
   background: var(--color-primary);
   color: var(--color-button-text);
   border: none;
-  padding: 0.75rem 1.35rem;
+  padding: 0.7rem 1.3rem;
   border-radius: 6px;
   cursor: pointer;
-  margin-top: 0.8rem;
+  margin-top: 0.7rem;
   font-weight: 600;
-  font-size: 1.05rem;
-  transition: background 0.15s, box-shadow 0.12s;
-  box-shadow: 0 1px 2px 0 rgba(38, 50, 56, 0.05);
+  transition: background 0.15s;
 }
 button:hover {
   background: var(--color-primary-dark);
-  box-shadow: 0 2px 8px 0 rgba(38, 50, 56, 0.09);
 }
 
 /* Modal */
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(38, 50, 56, 0.12);
+  background: rgba(38, 50, 56, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -163,11 +83,11 @@ button:hover {
 }
 .modal-content {
   background: #fff;
-  border-radius: 12px;
-  padding: 2rem 1.5rem 1.5rem 1.5rem;
+  border-radius: 10px;
+  padding: 2rem;
   max-width: 340px;
   min-width: 260px;
-  box-shadow: 0 4px 24px 0 rgba(38, 50, 56, 0.13);
+  box-shadow: 0 4px 18px 0 rgba(38, 50, 56, 0.15);
   text-align: center;
 }
 
@@ -177,49 +97,22 @@ button:hover {
   margin-top: 1.3rem;
 }
 
-.modal-confirm-btn {
-  background: var(--color-success);
-  color: #fff;
-}
-.modal-cancel-btn {
-  background: var(--color-error);
-  color: #fff;
-}
+.modal-confirm-btn { background: var(--color-success); color: #fff; }
+.modal-cancel-btn { background: var(--color-error); color: #fff; }
 
-/* Mensagem (feedback) */
 .mensagem {
-  margin-top: 1.2rem;
-  padding: 0.8rem 1rem;
+  margin-top: 1rem;
+  padding: 0.8rem;
   border-radius: 8px;
   background: var(--color-alert-bg);
   color: var(--color-alert-text);
-  font-weight: 500;
-  font-size: 1.06rem;
 }
 
-/* Dashboard IMC resultado */
 .resultado-imc {
   margin-top: 2rem;
   background: var(--color-card);
   border: 1px solid var(--color-border);
-  padding: 1.6rem 1.3rem;
+  padding: 1.5rem;
   border-radius: 10px;
   text-align: left;
-  font-size: 1.08rem;
-}
-
-/* Responsivo */
-@media (max-width: 700px) {
-  .form-card, .modal-content {
-    max-width: 98vw;
-    padding: 1.1rem 0.4rem;
-  }
-  .app-header {
-    padding: 16px 0 6px 0;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .logo-senai {
-    height: 38px;
-  }
 }

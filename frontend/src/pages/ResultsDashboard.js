@@ -1,5 +1,4 @@
 // frontend/src/pages/ResultsDashboard.js
-
 import React, { useState } from "react";
 import { calcularIMC } from "../api/respostaApi";
 import FormCard from "../components/FormCard";
@@ -44,11 +43,11 @@ const ResultsDashboard = () => {
           onChange={e => setAltura(e.target.value)}
           required
         />
-        <button type="submit">Calcular IMC</button>
+        <button type="submit" className="btn btn-primary">Calcular IMC</button>
       </FormCard>
       {mensagem && <p className="mensagem">{mensagem}</p>}
       {resultado && (
-        <div className="resultado-imc">
+        <div className="resultado-imc card" style={{ marginTop: 16 }}>
           <h4>Resultado:</h4>
           <p>IMC: <strong>{resultado.imc}</strong></p>
           <p>Classificação: <strong>{resultado.classificacao}</strong></p>

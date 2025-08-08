@@ -1,8 +1,7 @@
 # backend/app/services/formulario_service.py
 import uuid
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from backend.app.models import Formulario, Campo
 
 # ---------- Validações de schema ----------
@@ -38,7 +37,7 @@ def _extrair_nomes(campos: List[Dict[str, Any]]) -> Dict[str, int]:
     - senão cria do label normalizado.
     Garante unicidade (em memória) antes de persistir.
     """
-    nomes = {}
+    nomes: Dict[str, int] = {}
     for idx, c in enumerate(campos):
         nome = c.get("nome")
         if not nome or not isinstance(nome, str):
@@ -141,18 +140,28 @@ class FormularioService:
 
     @staticmethod
     def listar_formularios(db: Session) -> List[Formulario]:
-        return db.query(Formulario).filter_by(is_ativo=True).order_by(Formulario.data_criacao.desc()).all()
+        return (
+            db.query(Formulario)
+            .filter_by(is_ativo=True)
+            .order_by(Formulario.data_criacao.desc())
+            .all()
+        )
 
     @staticmethod
-    def obter_formulario(db: Session, id: str) -> Formulario | None:
+    def obter_formulario(db: Session, id: str) -> Optional[Formulario]:
         return db.query(Formulario).filter_by(id=id, is_ativo=True).first()
 
     @staticmethod
     def obter_formularios_por_usuario(db: Session, usuario: str) -> List[Formulario]:
-        return db.query(Formulario).filter_by(is_ativo=True, usuario=usuario).order_by(Formulario.data_criacao.desc()).all()
+        return (
+            db.query(Formulario)
+            .filter_by(is_ativo=True, usuario=usuario)
+            .order_by(Formulario.data_criacao.desc())
+            .all()
+        )
 
     @staticmethod
-    def atualizar_formulario(db: Session, id: str, payload) -> Formulario | None:
+    def atualizar_formulario(db: Session, id: str, payload) -> Optional[Formulario]:
         f = db.query(Formulario).filter_by(id=id, is_ativo=True).first()
         if not f:
             return None
@@ -170,8 +179,8 @@ class FormularioService:
         f.usuario = data.get("usuario")
         f.schema_version = int((f.schema_version or 1) + 1)
 
-        # apaga e recria (como você já vinha fazendo)
-        db.query(Campo).filter_by(formulario_id=f.id).delete()
+        # apaga e recria campos (modelo atual de versionamento)
+        db.query(Campo).filter_by(formulario_id=f.id).delete(synchronize_session=False)
         db.flush()
 
         for c in campos:
@@ -202,6 +211,6 @@ class FormularioService:
         from datetime import datetime
         f.is_ativo = False
         f.data_remocao = datetime.utcnow()
-        f.usuario_remocao = "system"  # TODO: integrar com auth/usuário real
+        f.usuario_remocao = "system"  # TODO: integrar usuário real
         db.commit()
         return True

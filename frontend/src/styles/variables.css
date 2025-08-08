@@ -1,18 +1,23 @@
 /* frontend/src/styles/variables.css */
-
-/* Variáveis de cor e tema SENAI-Saúde */
-
 :root {
-  --color-primary: #004D9D;        /* Azul padrão SENAI */
-  --color-primary-dark: #01376d;
-  --color-secondary: #0070c7;
-  --color-success: #44b170;
-  --color-error: #da2e32;
-  --color-background: #f5f7fa;     /* Cinza claro */
-  --color-card: #fff;
-  --color-border: #e0e6ef;
-  --color-text: #253857;
-  --color-button-text: #fff;
-  --color-alert-bg: #e3f2fd;
-  --color-alert-text: #004D9D;
+  /* Azul primário SENAI */
+  --color-primary: #005daa;
+  --color-primary-dark: #00467a;
+
+  /* Tons de cinza */
+  --color-text: #2e2e2e;
+  --color-border: #d1d5db;
+  --color-card: #f9f9f9;
+
+  /* Fundo branco */
+  --color-background: #ffffff;
+
+  /* Botões */
+  --color-button-text: #ffffff;
+
+  /* Alertas e status */
+  --color-success: #28a745;
+  --color-error: #dc3545;
+  --color-alert-bg: #fff3cd;
+  --color-alert-text: #856404;
 }

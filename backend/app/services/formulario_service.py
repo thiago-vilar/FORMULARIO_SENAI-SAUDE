@@ -3,15 +3,14 @@ import uuid
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from backend.app.models import Formulario, Campo
+from backend.app.models.formulario_historico import FormularioHistorico, CampoHistorico
 
 # ---------- Validações de schema ----------
-
 TIPOS_VALIDOS = {"text", "number", "select", "calculated"}
 
 def _validar_campos_basicos(campos: List[Dict[str, Any]]):
     if not isinstance(campos, list) or len(campos) == 0:
         raise ValueError("campos_vazios")
-
     for i, c in enumerate(campos):
         tipo = c.get("tipo")
         label = c.get("label")
@@ -19,24 +18,16 @@ def _validar_campos_basicos(campos: List[Dict[str, Any]]):
             raise ValueError(f"tipo_invalido:{tipo}@idx={i}")
         if not label or not isinstance(label, str):
             raise ValueError(f"label_invalido@idx={i}")
-
         if tipo == "select":
             opcoes = c.get("opcoes")
             if not opcoes or not isinstance(opcoes, list) or len(opcoes) == 0:
                 raise ValueError(f"opcoes_select_invalidas@idx={i}")
-
         if tipo == "calculated":
             expr = c.get("expressao")
             if not expr or not isinstance(expr, str):
                 raise ValueError(f"expressao_obrigatoria@idx={i}")
 
 def _extrair_nomes(campos: List[Dict[str, Any]]) -> Dict[str, int]:
-    """
-    Define 'nome' lógico:
-    - se vier 'nome', usa;
-    - senão cria do label normalizado.
-    Garante unicidade (em memória) antes de persistir.
-    """
     nomes: Dict[str, int] = {}
     for idx, c in enumerate(campos):
         nome = c.get("nome")
@@ -52,14 +43,12 @@ def _extrair_nomes(campos: List[Dict[str, Any]]) -> Dict[str, int]:
 def _validar_dependencias(campos: List[Dict[str, Any]]):
     nomes = _extrair_nomes(campos)
     deps_graph = {c["nome"]: list(c.get("dependencias") or []) for c in campos if c.get("tipo") == "calculated"}
-
-    # checa referências inexistentes
+    # refs inexistentes
     for nome, deps in deps_graph.items():
         for d in deps:
             if d not in nomes:
                 raise ValueError(f"dependencia_inexistente:{nome}->{d}")
-
-    # detecta ciclo (Kahn)
+    # ciclo (Kahn)
     indeg = {k: 0 for k in deps_graph}
     for k, vs in deps_graph.items():
         for v in vs:
@@ -79,11 +68,9 @@ def _validar_dependencias(campos: List[Dict[str, Any]]):
         raise ValueError("ciclo_dependencias")
 
 def _normalizar_campos(campos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    # number: aceita "float" vindo do front e normaliza
     for c in campos:
         if c.get("tipo") == "float":
             c["tipo"] = "number"
-        # opcional: coerção de opcoes para [{label, value}]
         if c.get("tipo") == "select":
             ops = c.get("opcoes") or []
             norm = []
@@ -96,13 +83,11 @@ def _normalizar_campos(campos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return campos
 
 # ---------- Service ----------
-
 class FormularioService:
     @staticmethod
     def criar_formulario(db: Session, payload) -> Formulario:
         data = payload.dict() if hasattr(payload, "dict") else dict(payload)
         campos = data.get("campos") or []
-
         _validar_campos_basicos(campos)
         _validar_dependencias(campos)
         _normalizar_campos(campos)
@@ -168,7 +153,6 @@ class FormularioService:
 
         data = payload.dict() if hasattr(payload, "dict") else dict(payload)
         campos = data.get("campos") or []
-
         _validar_campos_basicos(campos)
         _validar_dependencias(campos)
         _normalizar_campos(campos)
@@ -179,7 +163,6 @@ class FormularioService:
         f.usuario = data.get("usuario")
         f.schema_version = int((f.schema_version or 1) + 1)
 
-        # apaga e recria campos (modelo atual de versionamento)
         db.query(Campo).filter_by(formulario_id=f.id).delete(synchronize_session=False)
         db.flush()
 
@@ -214,3 +197,47 @@ class FormularioService:
         f.usuario_remocao = "system"  # TODO: integrar usuário real
         db.commit()
         return True
+
+    @staticmethod
+    def versionar_formulario(db: Session, formulario_id: str) -> FormularioHistorico:
+        """
+        Cria um snapshot da versão atual no histórico **e só então** incrementa o schema_version.
+        Não altera campos; é um version bump com auditoria.
+        """
+        form = db.query(Formulario).filter_by(id=formulario_id, is_ativo=True).first()
+        if not form:
+            raise ValueError("formulario_nao_encontrado")
+
+        versao_atual = int(form.schema_version or 1)
+
+        # 1) snapshot da versão atual
+        historico = FormularioHistorico(
+            formulario_id=form.id,
+            schema_version=versao_atual,
+            nome=form.nome,                 # 🔧 alinhado com modelo
+            descricao=form.descricao,
+            is_ativo=form.is_ativo,
+        )
+        db.add(historico)
+        db.flush()  # para ter historico.id
+
+        for campo in form.campos:
+            db.add(CampoHistorico(
+                formulario_historico_id=historico.id,
+                nome=campo.nome,
+                label=campo.label,
+                tipo=campo.tipo,
+                obrigatorio=campo.obrigatorio,
+                expressao=campo.expressao,
+                dependencias=campo.dependencias,
+                opcoes=campo.opcoes,
+                condicional=campo.condicional,
+                precisao=campo.precisao,
+                formato=campo.formato,
+            ))
+
+        # 2) incrementa versão do formulário
+        form.schema_version = versao_atual + 1
+        db.commit()
+        db.refresh(historico)
+        return historico

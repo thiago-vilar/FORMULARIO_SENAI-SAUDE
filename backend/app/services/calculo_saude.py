@@ -1,5 +1,4 @@
 # backend/app/services/calculo_saude.py
-
 def calcular_imc(peso: float, altura: float) -> float:
     if not peso or not altura or altura <= 0:
         return 0.0

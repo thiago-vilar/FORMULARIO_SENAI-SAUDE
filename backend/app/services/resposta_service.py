@@ -4,7 +4,7 @@ import uuid
 from typing import Dict, Any, Tuple, List
 from sqlalchemy.orm import Session
 from backend.app.models import Formulario, Campo, Resposta
-
+from backend.app.services.calculo_saude import calcular_imc, classificar_imc  # (+) expõe utilidades de domínio
 
 class RespostaService:
     # -------------------------- MAPA DE CAMPOS --------------------------
@@ -54,18 +54,30 @@ class RespostaService:
     def _avaliar(expr: str, ctx: Dict[str, Any]) -> Any:
         """
         Avaliador restrito. Sem builtins.
-        Você pode whitelistar funções aqui (min, max, abs, round, etc.)
+        Whitelist de funções úteis e suporte a '^' como potência.
         """
+        if not isinstance(expr, str):
+            raise ValueError("expressao_invalida:tipo")
+        # aceita potência no padrão usado nos exemplos
+        expr_python = expr.replace("^", "**")
+
         env = {
             "__builtins__": {},
-            # funções básicas úteis (se desejar)
+            # funções básicas úteis
             "min": min,
             "max": max,
             "abs": abs,
             "round": round,
+            # booleanos/None explícitos (úteis em ternários)
+            "True": True,
+            "False": False,
+            "None": None,
+            # utilidades de domínio
+            "calcular_imc": calcular_imc,
+            "classificar_imc": classificar_imc,
         }
         try:
-            return eval(expr, env, ctx)
+            return eval(expr_python, env, ctx)
         except Exception as e:
             raise ValueError(f"expressao_invalida:{expr} -> {e}")
 
@@ -81,13 +93,15 @@ class RespostaService:
 
         deps: Dict[str, List[str]] = {}   # apenas para calculados
         exprs: Dict[str, str] = {}        # nome_calculado -> expressão
+        precisao_por_nome: Dict[str, int] = {}
 
         # monta tabelas de expressões e dependências declaradas
         for nome, c in campos.items():
-            if c.tipo == "calculated" and c.expressao:
+            if (c.tipo or "").lower() == "calculated" and c.expressao:
                 exprs[nome] = c.expressao
+                precisao_por_nome[nome] = c.precisao if c.precisao is not None else None  # pode ser None
                 dep = c.dependencias if isinstance(c.dependencias, list) else []
-                # fallback ingênuo de inferência (opcional)
+                # fallback ingênuo de inferência (mantido)
                 if not dep:
                     dep = [d for d in campos.keys() if d in c.expressao and d != nome]
                 deps[nome] = dep
@@ -106,7 +120,17 @@ class RespostaService:
                 dependencias = deps.get(nome, [])
                 # só avança quando TODAS as dependências estão no contexto (base + já calculados)
                 if all(d in contexto for d in dependencias):
-                    contexto[nome] = RespostaService._avaliar(exprs[nome], contexto)
+                    valor = RespostaService._avaliar(exprs[nome], contexto)
+
+                    # aplica precisão se numérico
+                    prec = precisao_por_nome.get(nome)
+                    if isinstance(valor, (int, float)) and prec is not None:
+                        try:
+                            valor = round(float(valor), int(prec))
+                        except Exception:
+                            pass
+
+                    contexto[nome] = valor
                     resolvidos.append(nome)
 
             for r in resolvidos:
@@ -130,7 +154,7 @@ class RespostaService:
         """
         coerced = dict(payload)
         for nome, c in mapa.items():
-            if c.tipo == "number" and nome in coerced:
+            if (c.tipo or "").lower() == "number" and nome in coerced:
                 v = coerced[nome]
                 if isinstance(v, str):
                     v = v.strip().replace(",", ".")
@@ -155,7 +179,7 @@ class RespostaService:
 
         # valida obrigatórios (não calculados)
         for nome, c in mapa.items():
-            if c.tipo != "calculated" and c.obrigatorio:
+            if (c.tipo or "").lower() != "calculated" and c.obrigatorio:
                 if nome not in payload or payload[nome] in (None, "", []):
                     raise ValueError(f"campo_obrigatorio_faltando:{nome}")
 
@@ -204,3 +228,51 @@ class RespostaService:
         r.usuario_remocao = "system"
         db.commit()
         return True
+    
+    @staticmethod
+    def _observer_engine(form: Formulario, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Engine reativa: observa mudanças no payload e recalcula dependentes.
+        """
+        # neste momento, apenas reaproveita o cálculo atual
+        try:
+            return RespostaService._calcular(form, payload)
+        except ValueError as e:
+            raise ValueError(f"erro_engine_reativa:{e}")
+
+    @staticmethod
+    def criar_resposta(db: Session, formulario_id: str, payload: Dict[str, Any]) -> Resposta:
+        form: Formulario = (
+            db.query(Formulario)
+            .filter_by(id=formulario_id, is_ativo=True)
+            .first()
+        )
+        if not form:
+            raise ValueError("formulario_nao_encontrado")
+
+        mapa = RespostaService._mapa_campos(form)
+
+        # valida obrigatórios (não calculados)
+        for nome, c in mapa.items():
+            if (c.tipo or "").lower() != "calculated" and c.obrigatorio:
+                if nome not in payload or payload[nome] in (None, "", []):
+                    raise ValueError(f"campo_obrigatorio_faltando:{nome}")
+
+        # coerção de números
+        payload = RespostaService._coagir_numeros(mapa, payload)
+
+        # 🔹 Engine reativa (observer)
+        calculados = RespostaService._observer_engine(form, payload)
+
+        r = Resposta(
+            id=str(uuid.uuid4()),
+            formulario_id=form.id,
+            schema_version=form.schema_version,
+            respostas=payload,
+            calculados=calculados or None,
+        )
+        db.add(r)
+        db.commit()
+        db.refresh(r)
+        return r
+

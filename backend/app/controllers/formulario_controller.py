@@ -22,13 +22,9 @@ def get_db():
     summary="Criar novo formulário",
 )
 def criar(formulario: FormularioCreateSchema, db: Session = Depends(get_db)):
-    """
-    Cria um novo formulário com os campos especificados.
-    """
     try:
         return FormularioService.criar_formulario(db, formulario)
     except ValueError as e:
-        # Validações de schema (tipos, opções, dependências, ciclo...)
         raise HTTPException(status_code=422, detail=str(e))
 
 @router.get(
@@ -37,10 +33,6 @@ def criar(formulario: FormularioCreateSchema, db: Session = Depends(get_db)):
     summary="Listar todos os formulários",
 )
 def listar(usuario: Optional[str] = None, db: Session = Depends(get_db)):
-    """
-    Lista todos os formulários ativos.
-    Opcionalmente, pode filtrar por usuário: /formularios?usuario=fulano
-    """
     if usuario:
         return FormularioService.obter_formularios_por_usuario(db, usuario)
     return FormularioService.listar_formularios(db)
@@ -51,9 +43,6 @@ def listar(usuario: Optional[str] = None, db: Session = Depends(get_db)):
     summary="Buscar formulário por ID",
 )
 def get_formulario(id: str, db: Session = Depends(get_db)):
-    """
-    Retorna um formulário específico pelo seu ID.
-    """
     formulario = FormularioService.obter_formulario(db, id)
     if not formulario:
         raise HTTPException(status_code=404, detail="Formulário não encontrado")
@@ -65,27 +54,6 @@ def get_formulario(id: str, db: Session = Depends(get_db)):
     summary="Atualizar formulário (incrementa schema_version)",
 )
 def update_formulario(id: str, form: FormularioCreateSchema, db: Session = Depends(get_db)):
-    """
-    Atualiza um formulário existente, **recria os campos** e **incrementa `schema_version`**.
-    """
-    try:
-        formulario = FormularioService.atualizar_formulario(db, id, form)
-        if not formulario:
-            raise HTTPException(status_code=404, detail="Formulário não encontrado")
-        return formulario
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-
-@router.post(
-    "/formularios/{id}/versionar",
-    response_model=FormularioSchema,
-    summary="Criar nova versão do formulário (atalho de versionamento)",
-)
-def versionar_formulario(id: str, form: FormularioCreateSchema, db: Session = Depends(get_db)):
-    """
-    Endpoint **explícito** de versionamento.  
-    Aplica as mesmas validações do update, **recria campos** e **incrementa `schema_version`**.
-    """
     try:
         formulario = FormularioService.atualizar_formulario(db, id, form)
         if not formulario:
@@ -99,21 +67,40 @@ def versionar_formulario(id: str, form: FormularioCreateSchema, db: Session = De
     summary="Remover formulário (remoção lógica)",
 )
 def delete_formulario(id: str, db: Session = Depends(get_db)):
-    """
-    Remove logicamente um formulário (não apaga do banco, apenas marca como inativo).
-    """
     removido = FormularioService.deletar_formulario(db, id)
     if not removido:
         raise HTTPException(status_code=404, detail="Formulário não encontrado ou já removido")
     return {"ok": True, "message": "Formulário removido"}
 
-@router.get(
-    "/formularios/usuario/{usuario}",
-    response_model=List[FormularioSchema],
-    summary="Buscar formulários por usuário",
+# ---- Versionamento ----
+
+# Atalho: atualiza schema e incrementa versão (sem histórico materializado)
+@router.post(
+    "/formularios/{id}/versionar-atalho",
+    response_model=FormularioSchema,
+    summary="Criar nova versão do formulário (atalho, sem histórico)",
 )
-def get_formularios_por_usuario(usuario: str, db: Session = Depends(get_db)):
-    """
-    Retorna todos os formulários criados pelo usuário informado.
-    """
-    return FormularioService.obter_formularios_por_usuario(db, usuario)
+def versionar_atalho(id: str, form: FormularioCreateSchema, db: Session = Depends(get_db)):
+    try:
+        formulario = FormularioService.atualizar_formulario(db, id, form)
+        if not formulario:
+            raise HTTPException(status_code=404, detail="Formulário não encontrado")
+        return formulario
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+# Oficial: cria snapshot da versão atual no histórico e só então incrementa a versão
+@router.post(
+    "/formularios/{id}/versionar",
+    summary="Versionar formulário e salvar histórico (snapshot da versão atual)",
+)
+def versionar_oficial(id: str, db: Session = Depends(get_db)):
+    try:
+        historico = FormularioService.versionar_formulario(db, id)
+        return {
+            "mensagem": "Formulário versionado com sucesso",
+            "historico_id": historico.id,
+            "schema_version_snapshot": historico.schema_version,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

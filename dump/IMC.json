@@ -1,0 +1,6 @@
+FORM_ID=<id_imc>
+curl -s -X POST "http://localhost:3000/formularios/$FORM_ID/respostas" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "respostas": { "peso": 82.5, "altura": 178.0 }
+      }' | jq .

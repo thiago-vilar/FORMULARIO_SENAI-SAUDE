@@ -3,7 +3,7 @@
 import pytest
 from backend.app.services.calculo_saude import calcular_imc, classificar_imc
 from backend.app.services.campo_factory import CampoCalculadoFactory
-from backend.app.controllers.resposta_controller import _processar_resposta
+from backend.app.controllers.resposta_controller import _processar_resposta_imc as _processar_resposta
 
 def test_calcular_imc():
     assert calcular_imc(80, 180) == 24.69

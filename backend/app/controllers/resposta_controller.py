@@ -1,5 +1,4 @@
-# backend/app/controllers/resposta_controller.py
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -22,42 +21,54 @@ router = APIRouter()
 
 # ====== MODELOS (IMC) =========================================================
 class DadosIMC(BaseModel):
-    # Você especificou cm na descrição original; vamos aceitar cm ou m automaticamente:
-    # Se 'altura' > 3, assumimos que veio em cm e convertemos para metros.
-    peso: float = Field(..., gt=0, example=80.0, description="Peso em kg")
-    altura: float = Field(..., gt=0, example=180.0, description="Altura em cm (ou metros se <= 3.0)")
+    # Aceita cm ou m: se altura <= 3, consideramos metros; caso contrário, cm.
+    peso: float = Field(..., gt=0, json_schema_extra={"example": 80.0}, description="Peso em kg")
+    altura: float = Field(..., gt=0, json_schema_extra={"example": 180.0}, description="Altura em cm (ou metros se <= 3.0)")
+
 
 class RespostaIMC(BaseModel):
     peso: float
-    altura: float  # normalizamos para metros na resposta
+    altura: float  # normalizada para metros na resposta
     imc: float
     classificacao: str
 
 
 # ====== HELPERS ===============================================================
-def _normalizar_altura(altura: float) -> float:
+def _normalizar_altura_para_cm(altura: float) -> float:
     """
-    Se altura > 3, assume que veio em cm e converte para metros.
+    Se altura <= 3, assume metros e converte para cm.
+    Se altura > 3, assume cm e mantém.
     """
-    return altura / 100.0 if altura > 3 else altura
+    return altura * 100.0 if altura <= 3 else altura
+
 
 def _processar_resposta_imc(dados_resposta: Dict[str, Any]) -> Dict[str, Any]:
     peso = dados_resposta.get("peso")
-    altura = _normalizar_altura(dados_resposta.get("altura"))
+    altura = dados_resposta.get("altura")
 
-    if peso is None or altura is None or peso <= 0 or altura <= 0:
+    # valida cedo para evitar TypeError
+    if peso is None or altura is None:
+        raise ValueError("Peso e altura são obrigatórios.")
+    if peso <= 0 or altura <= 0:
         raise ValueError("Peso e altura devem ser valores positivos.")
 
-    # Usa sua Factory existente
-    imc = CampoCalculadoFactory.criar_campo_calculado("imc", peso=peso, altura=altura)
-    classificacao = CampoCalculadoFactory.criar_campo_calculado("classificacao", imc=imc)
+    # Factory espera altura em cm
+    altura_cm = _normalizar_altura_para_cm(float(altura))
+    imc = CampoCalculadoFactory.criar_campo_calculado("imc", peso=float(peso), altura=float(altura_cm))
+    classificacao = CampoCalculadoFactory.criar_campo_calculado("classificacao", imc=float(imc))
 
+    # Resposta com altura em metros
     return {
         "peso": float(peso),
-        "altura": float(altura),  # já em metros
+        "altura": float(altura_cm / 100.0),
         "imc": float(imc),
         "classificacao": str(classificacao),
     }
+
+
+# ---- Compat com testes antigos (mantém import esperado) ----------------------
+def _processar_resposta(dados_resposta: Dict[str, Any]) -> Dict[str, Any]:
+    return _processar_resposta_imc(dados_resposta)
 
 
 # ====== ENDPOINTS (IMC) =======================================================
@@ -72,13 +83,14 @@ def calcular_imc_endpoint(dados: DadosIMC):
     Calcula o IMC e a classificação de risco a partir do peso e altura informados.
     """
     try:
-        result = _processar_resposta_imc(dados.dict())
+        # Pydantic v2
+        result = _processar_resposta_imc(dados.model_dump())
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# ====== DEPENDÊNCIAS (DB) =====================================================
+# ====== DEPENDÊNCIAS (DB) ====================================================
 def get_db():
     db = DatabaseSessionFactory()()
     try:

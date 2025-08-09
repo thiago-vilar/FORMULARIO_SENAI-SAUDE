@@ -1,12 +1,14 @@
-# backend/app/services/formulario_service.py
 import uuid
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from backend.app.models import Formulario, Campo
 from backend.app.models.formulario_historico import FormularioHistorico, CampoHistorico
 
+
 # ---------- Validações de schema ----------
-TIPOS_VALIDOS = {"text", "number", "select", "calculated"}
+# Inclui "float" e "number" (testes usam "float")
+TIPOS_VALIDOS = {"text", "float", "number", "select", "calculated"}
+
 
 def _validar_campos_basicos(campos: List[Dict[str, Any]]):
     if not isinstance(campos, list) or len(campos) == 0:
@@ -27,6 +29,7 @@ def _validar_campos_basicos(campos: List[Dict[str, Any]]):
             if not expr or not isinstance(expr, str):
                 raise ValueError(f"expressao_obrigatoria@idx={i}")
 
+
 def _extrair_nomes(campos: List[Dict[str, Any]]) -> Dict[str, int]:
     nomes: Dict[str, int] = {}
     for idx, c in enumerate(campos):
@@ -40,14 +43,17 @@ def _extrair_nomes(campos: List[Dict[str, Any]]) -> Dict[str, int]:
         nomes[nome] = idx
     return nomes
 
+
 def _validar_dependencias(campos: List[Dict[str, Any]]):
     nomes = _extrair_nomes(campos)
     deps_graph = {c["nome"]: list(c.get("dependencias") or []) for c in campos if c.get("tipo") == "calculated"}
+
     # refs inexistentes
     for nome, deps in deps_graph.items():
         for d in deps:
             if d not in nomes:
                 raise ValueError(f"dependencia_inexistente:{nome}->{d}")
+
     # ciclo (Kahn)
     indeg = {k: 0 for k in deps_graph}
     for k, vs in deps_graph.items():
@@ -67,10 +73,14 @@ def _validar_dependencias(campos: List[Dict[str, Any]]):
     if deps_graph and visit != len(deps_graph):
         raise ValueError("ciclo_dependencias")
 
+
 def _normalizar_campos(campos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for c in campos:
+        # converte "float" para "number"
         if c.get("tipo") == "float":
             c["tipo"] = "number"
+
+        # normaliza opções do select
         if c.get("tipo") == "select":
             ops = c.get("opcoes") or []
             norm = []
@@ -80,13 +90,29 @@ def _normalizar_campos(campos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 elif isinstance(op, dict) and "value" in op and "label" in op:
                     norm.append(op)
             c["opcoes"] = norm
+
+        # condicional pode vir como string; garanta dict
+        cond = c.get("condicional")
+        if isinstance(cond, str):
+            c["condicional"] = {"expressao": cond}
+
     return campos
+
+
+def _payload_to_dict(payload) -> Dict[str, Any]:
+    # Compat Pydantic v1/v2
+    if hasattr(payload, "model_dump"):
+        return payload.model_dump()
+    if hasattr(payload, "dict"):
+        return payload.dict()
+    return dict(payload)
+
 
 # ---------- Service ----------
 class FormularioService:
     @staticmethod
     def criar_formulario(db: Session, payload) -> Formulario:
-        data = payload.dict() if hasattr(payload, "dict") else dict(payload)
+        data = _payload_to_dict(payload)
         campos = data.get("campos") or []
         _validar_campos_basicos(campos)
         _validar_dependencias(campos)
@@ -151,7 +177,7 @@ class FormularioService:
         if not f:
             return None
 
-        data = payload.dict() if hasattr(payload, "dict") else dict(payload)
+        data = _payload_to_dict(payload)
         campos = data.get("campos") or []
         _validar_campos_basicos(campos)
         _validar_dependencias(campos)

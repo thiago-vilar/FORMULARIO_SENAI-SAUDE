@@ -1,0 +1,11 @@
+FORM_ID=<id_triagem>
+curl -s -X POST "http://localhost:3000/formularios/$FORM_ID/respostas" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "respostas": {
+          "sexo":"masculino",
+          "peso": 95.0,
+          "altura": 173.0,
+          "circ_abdomen": 105.0
+        }
+      }' | jq .

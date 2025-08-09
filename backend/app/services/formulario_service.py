@@ -201,8 +201,8 @@ class FormularioService:
     @staticmethod
     def versionar_formulario(db: Session, formulario_id: str) -> FormularioHistorico:
         """
-        Cria um snapshot da versão atual no histórico **e só então** incrementa o schema_version.
-        Não altera campos; é um version bump com auditoria.
+        Snapshot da versão atual no histórico **e só então** incrementa o schema_version.
+        Endpoint correspondente (sem body): POST /formularios/{id}/versionar
         """
         form = db.query(Formulario).filter_by(id=formulario_id, is_ativo=True).first()
         if not form:
@@ -214,12 +214,12 @@ class FormularioService:
         historico = FormularioHistorico(
             formulario_id=form.id,
             schema_version=versao_atual,
-            nome=form.nome,                 # 🔧 alinhado com modelo
+            nome=form.nome,
             descricao=form.descricao,
             is_ativo=form.is_ativo,
         )
         db.add(historico)
-        db.flush()  # para ter historico.id
+        db.flush()  # precisa do historico.id
 
         for campo in form.campos:
             db.add(CampoHistorico(

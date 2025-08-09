@@ -74,7 +74,7 @@ def delete_formulario(id: str, db: Session = Depends(get_db)):
 
 # ---- Versionamento ----
 
-# Atalho: atualiza schema e incrementa versão (sem histórico materializado)
+# Atalho: atualiza schema + incrementa versão (sem salvar histórico)
 @router.post(
     "/formularios/{id}/versionar-atalho",
     response_model=FormularioSchema,
@@ -89,7 +89,7 @@ def versionar_atalho(id: str, form: FormularioCreateSchema, db: Session = Depend
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-# Oficial: cria snapshot da versão atual no histórico e só então incrementa a versão
+# Oficial: **sem body** — cria snapshot e depois sobe a versão
 @router.post(
     "/formularios/{id}/versionar",
     summary="Versionar formulário e salvar histórico (snapshot da versão atual)",
